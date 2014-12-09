@@ -39,6 +39,8 @@ class Car:
         # since instantation
         self.time_elapsed = 0
 
+        self.fixed_route = []
+
         car_id += 1
 
     def __str__(self):
@@ -68,7 +70,7 @@ def get_grid_graph(n):
     '''
     Construct a grid graph using graph.py
     '''
-    nodes, _ = gm.generateGraph(n, int(math.sqrt(n)) + 4, int(math.sqrt(n)) + 4, CONNECTIVITY)
+    nodes = gm.generateGraph(n, int(math.sqrt(n)) + 4, int(math.sqrt(n)) + 4, CONNECTIVITY)
     return convert_graph(gm.get_graph_representation(nodes))
 
 def convert_graph(version):
@@ -176,6 +178,18 @@ def gen_routing_table(graph, starts_set):
 
     return routing_table
 
+def gen_route(routing_table, start, dest):
+    route = []
+    curr_node = start
+    while dest in routing_table[curr_node] and routing_table[curr_node][dest] != None:
+        route.append(curr_node)
+        curr_node = routing_table[curr_node][dest]
+
+    route.pop(0)
+    route.append(dest)
+
+    return route
+
 def print_cars(cars):
     print '################## CARS ##################'
     for car in cars:
@@ -194,7 +208,7 @@ def evaluate(arrived_cars):
 
     return sum_elapsed / float(len(arrived_cars))
 
-def one_timestep(graph, cars, centralized=False, naive_routing_table=None):
+def one_timestep(graph, road_cost_map, cars, fix_route=False, centralized=False, naive_routing_table=None):
     '''
     Simulate the passage of one unit of time. This involves increment the position
     of each car, labeling the cars that have arrived at their destinations, and
@@ -269,40 +283,52 @@ def one_timestep(graph, cars, centralized=False, naive_routing_table=None):
             cost = road_cost_map[current_node][next_node](traffic)
             cost_graph[current_node][next_node] = cost
 
-    # STEP 4: 
-    # Use cost graph to generate routing table
-    routing_table = None
+    # STEP 4
+    # Use cost graph to route cars
+    if fix_route:
+        for car in waiting_cars:
+            car.next_node = car.fixed_route[0]
+            car.fixed_route.pop(0)
+            car.progress = 0
+            car.road_cost = cost_graph[car.current_node][car.next_node]
 
-    if naive_routing_table:
-        routing_table = naive_routing_table
+            # Update traffic info for later cars
+            traffic_graph[car.current_node][car.next_node] += 1
+            new_traffic = traffic_graph[car.current_node][car.next_node]
+            new_cost = road_cost_map[car.current_node][car.next_node](new_traffic)
+            cost_graph[car.current_node][car.next_node] = new_cost
 
     else:
-        routing_table = gen_routing_table(cost_graph, starts_set)
+        routing_table = None
 
-    # STEP 5:
-    # Use routing table to route the cars that are waiting at junctions
-    for car in waiting_cars:
-        car.next_node = routing_table[car.current_node][car.dest]
-        car.progress = 0
-        car.road_cost = cost_graph[car.current_node][car.next_node]
+        if naive_routing_table:
+            routing_table = naive_routing_table
 
-        # Update traffic info for later cars
-        traffic_graph[car.current_node][car.next_node] += 1
-        new_traffic = traffic_graph[car.current_node][car.next_node]
-        new_cost = road_cost_map[car.current_node][car.next_node](new_traffic)
-        cost_graph[car.current_node][car.next_node] = new_cost
-
-        # If centralized parameter is set to true, we simulate that the 
-        # the coordinated driverless cars will know in advance the turns
-        # of nearby cars, and will thus have access to up-to-date routing 
-        # information based on the near-future behavior of other cars 
-        # on the road.
-        if centralized:
+        else:
             routing_table = gen_routing_table(cost_graph, starts_set)
+
+        for car in waiting_cars:
+            car.next_node = routing_table[car.current_node][car.dest]
+            car.progress = 0
+            car.road_cost = cost_graph[car.current_node][car.next_node]
+
+            # Update traffic info for later cars
+            traffic_graph[car.current_node][car.next_node] += 1
+            new_traffic = traffic_graph[car.current_node][car.next_node]
+            new_cost = road_cost_map[car.current_node][car.next_node](new_traffic)
+            cost_graph[car.current_node][car.next_node] = new_cost
+
+            # If centralized parameter is set to true, we simulate that the 
+            # the coordinated driverless cars will know in advance the turns
+            # of nearby cars, and will thus have access to up-to-date routing 
+            # information based on the near-future behavior of other cars 
+            # on the road.
+            if centralized:
+                routing_table = gen_routing_table(cost_graph, starts_set)
 
     return new_car_list, arrived_cars
 
-def test(num_total_cars, graph, road_cost_map, spawn_probability, centralized=False, use_naive=False, printable=False):
+def test(num_total_cars, graph, road_cost_map, spawn_probability, fix_route=False, centralized=False, use_naive=False, printable=False):
     '''
     This function tests the performance of an algorithm (specified by the parameters centralized and use_naive).
     If centralized=False and use_naive=True, this runs Alg0.
@@ -333,6 +359,21 @@ def test(num_total_cars, graph, road_cost_map, spawn_probability, centralized=Fa
                 special_dest = terminus
 
     while len(arrived) < num_total_cars:
+        traffic_graph = copy.deepcopy(graph)
+        for car in cars:
+            if car.next_node:
+                traffic_graph[car.current_node][car.next_node] += 1
+
+        cost_graph = copy.deepcopy(graph)
+        for current_node in cost_graph:
+            for next_node in cost_graph[current_node]:
+                traffic = traffic_graph[current_node][next_node]
+                cost = road_cost_map[current_node][next_node](traffic)
+                cost_graph[current_node][next_node] = cost
+
+        routing_table = gen_routing_table(cost_graph, nodes)
+
+
         for node in nodes:
             '''
             if random.random() < spawn_probability[node]:
@@ -346,7 +387,7 @@ def test(num_total_cars, graph, road_cost_map, spawn_probability, centralized=Fa
             #n = int(random.random() * spawn_probability[node] * 30)
 
             # Instantiate 4 cars with source=special_start, dest=special_dest
-            n = 4 if node==special_start else 0
+            n = 8 if node==special_start else 0
             for z in range(n):
                 dest = special_dest
                 counter = 0
@@ -367,6 +408,9 @@ def test(num_total_cars, graph, road_cost_map, spawn_probability, centralized=Fa
                     break
 
                 new_car = Car(source=node, dest=dest)
+                if fix_route:
+                    new_car.fixed_route = gen_route(routing_table, node, dest)
+
                 cars.append(new_car)
 
         temp_naive = copy.deepcopy(naive_routing_table)
@@ -375,7 +419,7 @@ def test(num_total_cars, graph, road_cost_map, spawn_probability, centralized=Fa
                     
         if printable:
             print_cars(cars)
-        cars, arrived_cars = one_timestep(graph, cars, centralized=centralized, naive_routing_table=temp_naive)
+        cars, arrived_cars = one_timestep(graph, road_cost_map, cars, fix_route=fix_route, centralized=centralized, naive_routing_table=temp_naive)
 
         arrived += arrived_cars 
         i += 1
@@ -393,14 +437,58 @@ def test(num_total_cars, graph, road_cost_map, spawn_probability, centralized=Fa
     # Return the average travel time of all the cars that have arrived
     return avg_elapsed
 
-graph, road_cost_map, spawn_probability = get_grid_graph(12)
-zero_traffic_cost_map = get_zero_traffic_cost_map(graph, road_cost_map)
+#graph, road_cost_map, spawn_probability = get_grid_graph(12)
+#zero_traffic_cost_map = get_zero_traffic_cost_map(graph, road_cost_map)
 
-z = 100
+def evaluate_algo(z, fix_route, centralized, use_naive):
+    li = []
+    print "This trial's result,", "Average of all trials"
+    for i in range(z):
+        graph, road_cost_map, spawn_probability = get_grid_graph(12)
+        avg_delta = test(30, graph, road_cost_map, spawn_probability, fix_route=fix_route, centralized=centralized, use_naive=use_naive, printable=False)
+        li.append(avg_delta)
+        print str("%.1f" % avg_delta) + ',', "%.1f" % avg(li)
+
+    return avg(li)
+
+def print_divider():
+    print ''
+    print '###########################################'
+    print ''
+
+def main():
+    print 'Evaluating naive baseline'
+    naive = evaluate_algo(100, False, False, True)
+    print_divider()
+    print 'Evaluating fixed baseline'
+    fixed = evaluate_algo(400, True, False, False)
+    print_divider()
+    print 'Evaluating dynamic algorithm'
+    dynamic = evaluate_algo(400, False, False, False)
+    print_divider()
+    print 'Evaluating centralized dynamic algorithm'
+    centralized = evaluate_algo(400, False, True, False)
+    print_divider()
+
+    print 'naive', naive
+    print 'fixed', fixed
+    print 'dynamic', dynamic
+    print 'centralized', centralized
+
+if __name__ == '__main__':
+    main()
+
+
+'''
+z = 400
 li = []
+print "This trial's result,", "Average of all trials"
 for i in range(z):
     graph, road_cost_map, spawn_probability = get_grid_graph(12)
-    avg_delta = test(30, graph, road_cost_map, spawn_probability, centralized=False, use_naive=True, printable=False)
+    avg_delta = test(30, graph, road_cost_map, spawn_probability, fix_route=True, centralized=False, use_naive=False, printable=False)
     li.append(avg_delta)
-    print avg_delta, avg(li)
+    print str("%.1f" % avg_delta) + ',', "%.1f" % avg(li)
+'''
+
+
 
