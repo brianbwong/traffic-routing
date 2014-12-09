@@ -2,7 +2,7 @@
 # 
 # Author: Brian Wong and Kevin Mu
 # Class: Computer Science 143
-# Date: December 10, 2014
+# Date: December 2, 2014
 # Description: A class that creates the graph representation.
 #
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *

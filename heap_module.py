@@ -1,3 +1,13 @@
+# * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+# 
+# Author: Brian Wong and Kevin Mu
+# Class: Computer Science 143
+# Date: December 2, 2014
+# Description: This module implements a min-heap, which supports a more
+#              efficient Dijkstra's algorithm.
+#
+# * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+
 def heapifyUp(heap, i, value):
     item = heap[i]
     parentIndex = (i-1)/2

@@ -1,3 +1,13 @@
+# * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+# 
+# Authors: Brian Wong and Kevin Mu
+# Class: Computer Science 143
+# Date: December 2, 2014
+# Description: Our main code file, which implements our algorithms
+#              as well as our simulation environment.
+#
+# * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+
 import time
 import random
 import copy
@@ -179,6 +189,10 @@ def gen_routing_table(graph, starts_set):
     return routing_table
 
 def gen_route(routing_table, start, dest):
+    '''
+    Generate a route in list-form from start to dest based on 
+    the given routing_table.
+    '''
     route = []
     curr_node = start
     while dest in routing_table[curr_node] and routing_table[curr_node][dest] != None:
@@ -359,6 +373,8 @@ def test(num_total_cars, graph, road_cost_map, spawn_probability, fix_route=Fals
                 special_dest = terminus
 
     while len(arrived) < num_total_cars:
+        # First generate routing table based on current conditions
+        # to use if fix_route=False
         traffic_graph = copy.deepcopy(graph)
         for car in cars:
             if car.next_node:
@@ -375,24 +391,12 @@ def test(num_total_cars, graph, road_cost_map, spawn_probability, fix_route=Fals
 
 
         for node in nodes:
-            '''
-            if random.random() < spawn_probability[node]:
-                dest = random.choice(nodes)
-                while dest == node or (naive_routing_table[node][dest]==None):
-                    dest = random.choice(nodes)
-                new_car = Car(source=node, dest=dest)
-                cars.append(new_car)
-            '''
-
-            #n = int(random.random() * spawn_probability[node] * 30)
-
             # Instantiate 4 cars with source=special_start, dest=special_dest
-            n = 8 if node==special_start else 0
+            n = 4 if node==special_start else 0
             for z in range(n):
                 dest = special_dest
                 counter = 0
                 ongoing = True
-                #dest = random.choice(nodes)
                 while dest == node or (naive_routing_table[node][dest]==None):
                     # It is possible that the chosen start node will not be able to reach
                     # any other node. To skip over these bad start nodes we keep a counter
@@ -437,10 +441,10 @@ def test(num_total_cars, graph, road_cost_map, spawn_probability, fix_route=Fals
     # Return the average travel time of all the cars that have arrived
     return avg_elapsed
 
-#graph, road_cost_map, spawn_probability = get_grid_graph(12)
-#zero_traffic_cost_map = get_zero_traffic_cost_map(graph, road_cost_map)
-
 def evaluate_algo(z, fix_route, centralized, use_naive):
+    '''
+    Run z simulations with the given algorithm parameters and return performance result.
+    '''
     li = []
     print "This trial's result,", "Average of all trials"
     for i in range(z):
@@ -477,18 +481,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-'''
-z = 400
-li = []
-print "This trial's result,", "Average of all trials"
-for i in range(z):
-    graph, road_cost_map, spawn_probability = get_grid_graph(12)
-    avg_delta = test(30, graph, road_cost_map, spawn_probability, fix_route=True, centralized=False, use_naive=False, printable=False)
-    li.append(avg_delta)
-    print str("%.1f" % avg_delta) + ',', "%.1f" % avg(li)
-'''
-
-
 
